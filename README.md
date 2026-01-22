@@ -1,9 +1,9 @@
-🤖 Vox AI
+###🤖 Vox AI
 
 A web-based AI Voice Assistant built using modern web technologies and a vibe-driven development approach.
 It allows users to interact with AI using voice, receive spoken responses, and customize the experience in real time.
 
-✨ Features
+###✨ Features
 
 Real-time voice input & speech recognition
 
@@ -17,7 +17,7 @@ Conversation history storage
 
 Custom voice, language & response settings
 
-🛠️ Tech Stack
+###🛠️ Tech Stack
 
 HTML, Tailwind CSS, JavaScript
 
@@ -27,7 +27,7 @@ Google Gemini API
 
 LocalStorage
 
-🚀 Highlights
+###🚀 Highlights
 
 Clean and responsive UI
 
@@ -37,7 +37,7 @@ Fully customizable settings
 
 No frameworks — pure logic & control
 
-👨‍💻 Author
+###👨‍💻 Author
 
 Chittela Venkata Nikhil Reddy
 CSE Undergraduate| Aspiring Software & Cybersecurity Engineer
