@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar styling */
+        .history-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .history-scrollbar::-webkit-scrollbar-track {
+            background: var(--c-card-bg);
+        }
+        .history-scrollbar::-webkit-scrollbar-thumb {
+            background: var(--c-card-hover-bg);
+            border-radius: 4px;
+        }
+        .history-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: var(--c-accent);
+        }
+
+        /* --- THEME DEFINITIONS --- */
+        /* Default Theme: Midnight Gold */
+        :root {
+            --c-bg: #030712; /* gray-950 */
+            --c-text-primary: #f9fafb; /* gray-50 */
+            --c-text-secondary: #d1d5db; /* gray-300 */
+            --c-accent: #f59e0b; /* amber-500 */
+            --c-accent-content: #111827; /* gray-900 */
+            --c-sidebar-bg: #000000;
+            --c-card-bg: #374151; /* gray-700 */
+            --c-card-hover-bg: #4b5563; /* gray-600 */
+            --c-border: #4b5563; /* gray-600 */
+            --c-chat-bg: #1f2937; /* gray-800 */
+            --c-waveform: #FFFFFF;
+        }
+
+        [data-theme="modernist"] {
+            --c-bg: #ffffff;
+            --c-text-primary: #b45309; /* amber-700 - Per request for yellow text, made dark for readability */
+            --c-text-secondary: #9ca3af; /* gray-400 */
+            --c-accent: #f59e0b; /* amber-500 */
+            --c-accent-content: #111827; /* gray-900 */
+            --c-sidebar-bg: #f3f4f6; /* gray-100 */
+            --c-card-bg: #e5e7eb; /* gray-200 */
+            --c-card-hover-bg: #d1d5db; /* gray-300 */
+            --c-border: #d1d5db; /* gray-300 */
+            --c-chat-bg: #f9fafb; /* gray-50 */
+            --c-waveform: #000000;
+        }
+
+        [data-theme="bumblebee"] {
+            --c-bg: #facc15; /* yellow-400 */
+            --c-text-primary: #1f2937; /* gray-800 */
+            --c-text-secondary: #4b5563; /* gray-600 */
+            --c-accent: #1f2937; /* gray-800 */
+            --c-accent-content: #ffffff;
+            --c-sidebar-bg: #eab308; /* yellow-500 */
+            --c-card-bg: #fde047; /* yellow-300 */
+            --c-card-hover-bg: #fef08a; /* yellow-200 */
+            --c-border: #1f2937; /* gray-800 */
+            --c-chat-bg: #fde047; /* yellow-300 */
+            --c-waveform: #000000;
+        }
+
+        [data-theme="industrial"] {
+            --c-bg: #d1d5db; /* gray-300 */
+            --c-text-primary: #1f2937; /* gray-800 */
+            --c-text-secondary: #4b5563; /* gray-600 */
+            --c-accent: #dc2626; /* red-600 */
+            --c-accent-content: #ffffff;
+            --c-sidebar-bg: #1f2937; /* gray-800 */
+            --c-card-bg: #e5e7eb; /* gray-200 */
+            --c-card-hover-bg: #f3f4f6; /* gray-100 */
+            --c-border: #9ca3af; /* gray-400 */
+            --c-chat-bg: #e5e7eb; /* gray-200 */
+            --c-waveform: #000000;
+        }
+        
+        /* --- THEME APPLICATION --- */
+        /* General */
+        body { background-color: var(--c-bg); color: var(--c-text-primary); }
+        .text-secondary { color: var(--c-text-secondary); }
+        .text-accent { color: var(--c-accent); }
+        .bg-accent { background-color: var(--c-accent); }
+        .text-accent-content { color: var(--c-accent-content); }
+        .border-theme { border-color: var(--c-border); }
+
+        /* Sidebar & Navigation */
+        #sidebar { background-color: var(--c-sidebar-bg); }
+        .nav-btn { color: var(--c-text-secondary); }
+        .nav-btn:hover { background-color: var(--c-accent); color: var(--c-accent-content); }
+        .nav-btn:hover span { color: var(--c-accent-content) !important; }
+        .nav-btn:hover svg { stroke: var(--c-accent-content); }
+        #sidebar-toggle-btn { background-color: var(--c-sidebar-bg); color: var(--c-text-secondary); }
+        
+        /* Buttons & Cards */
+        .card { background-color: var(--c-card-bg); }
+        .card-hover:hover { background-color: var(--c-card-hover-bg); }
+        .btn-accent { background-color: var(--c-accent); color: var(--c-accent-content); }
+        .btn-accent:hover { filter: brightness(90%); }
+        .btn-danger { background-color: #dc2626; color: white; }
+        .btn-danger:hover { background-color: #b91c1c; }
+        .btn-themed { background-color: var(--c-card-bg); }
+        .btn-themed:hover { background-color: var(--c-card-hover-bg); }
+
+        /* Settings & Forms */
+        .setting-item { border-bottom-color: var(--c-border); }
+        .setting-item:last-child { border-bottom: none; }
+        fieldset { border-color: var(--c-border); }
+        select, input[type="password"] { background-color: var(--c-card-bg); }
+
+        /* Chat */
+        .chat-bg { background-color: var(--c-chat-bg); }
+        .chat-gradient { background-image: linear-gradient(to top, var(--c-chat-bg), transparent); }
+    </style>
+</head>
+<body class="font-sans overflow-hidden">
+    
+    <div id="app-container" class="w-screen h-screen flex">
+
+        <aside id="sidebar" class="absolute z-20 h-full text-white transition-transform duration-300 ease-in-out w-64 transform translate-x-0">
+            <div class="relative flex flex-col p-4 space-y-4 h-full">
+                <nav class="mt-24 flex-1">
+                    <ul class="space-y-2">
+                        <li>
+                            <button id="home-btn" data-view="home" class="nav-btn w-full flex items-center p-3 space-x-3 rounded-lg transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                                <span class="font-semibold nav-text text-secondary">Home</span>
+                            </button>
+                        </li>
+                        <li>
+                            <button id="chat-btn" data-view="chat" class="nav-btn w-full flex items-center p-3 space-x-3 rounded-lg transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"></rect><line x1="12" x2="12" y1="8" y2="16"></line><line x1="8" x2="16" y1="12" y2="12"></line></svg>
+                                <span class="font-semibold nav-text text-secondary">Chat</span>
+                            </button>
+                        </li>
+                        <li>
+                             <button id="history-btn" data-view="history" class="nav-btn w-full flex items-center p-3 space-x-3 rounded-lg transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>
+                                <span class="font-semibold nav-text text-secondary">History</span>
+                            </button>
+                        </li>
+                        <li>
+                             <button data-view="settings" class="nav-btn w-full flex items-center p-3 space-x-3 rounded-lg transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1 0 2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                <span class="font-semibold nav-text text-secondary">Settings</span>
+                            </button>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+
+        <main id="main-content" class="flex-1 flex flex-col relative transition-all duration-300 ease-in-out pl-64">
+             <button id="sidebar-toggle-btn" class="absolute top-4 left-4 z-30 p-2 rounded-full">
+                <svg id="sidebar-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-300"><path d="m15 18-6-6 6-6"></path></svg>
+            </button>
+            
+            <div id="home-view" class="view-container flex flex-1 flex-col items-center justify-center p-8 text-center">
+                <div class="max-w-4xl">
+                    <img src="logo.jpg" alt="RoboCoupler Logo" class="w-80 h-40 mx-auto mb-8 object-contain">
+                    <h1 class="text-5xl font-bold text-accent">Welcome to Your AI Voice Assistant</h1>
+                    <p class="text-xl text-secondary mt-4">
+                        This is a fully-featured, voice-driven AI assistant built with modern web technologies. 
+                        You can interact with a powerful AI, customize the experience, and even view your past conversations.
+                    </p>
+                    <div class="mt-12 text-left space-y-4">
+                        <h2 class="text-3xl font-semibold">Features:</h2>
+                        <ul class="list-disc list-inside text-lg text-secondary space-y-2">
+                            <li><span class="font-semibold text-accent">Real-time Voice Interaction:</span> Click the logo to start a hands-free conversation.</li>
+                            <li><span class="font-semibold text-accent">Live Audio Waveform:</span> See your voice visualized as you speak.</li>
+                            <li><span class="font-semibold text-accent">AI-Powered Responses:</span> Get intelligent answers from Google's Gemini API.</li>
+                            <li><span class="font-semibold text-accent">Text-to-Speech Output:</span> Hear the AI's responses spoken back to you.</li>
+                            <li><span class="font-semibold text-accent">Full Customization:</span> Use the settings to change themes, fonts, response length, and more.</li>
+                            <li><span class="font-semibold text-accent">Conversation History:</span> Your chats are automatically saved and can be revisited anytime.</li>
+                        </ul>
+                    </div>
+                     <button id="start-chatting-btn" class="mt-12 px-8 py-4 btn-accent font-bold text-xl rounded-lg transition-transform transform hover:scale-105">
+                        Start Chatting
+                    </button>
+                </div>
+            </div>
+
+            <div id="chat-view" class="view-container hidden flex flex-1 flex-col items-center justify-center w-full p-4 md:p-8">
+                <div class="flex-1 flex flex-col items-center justify-center w-full max-w-4xl">
+                    <div class="w-64 h-32 mb-8 flex items-center justify-center">
+                        <button id="logo-btn" class="w-full h-full bg-transparent rounded-lg shadow-lg hover:opacity-90 transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-yellow-300 focus:ring-opacity-50">
+                            <img src="logo.jpg" alt="Logo" class="w-full h-full object-contain">
+                        </button>
+                    </div>
+                    <div class="w-full h-24 mb-8">
+                        <canvas id="waveform-canvas" class="w-full h-full rounded-lg"></canvas>
+                    </div>
+                    <div class="w-full h-80 md:h-96 chat-bg rounded-lg p-4 overflow-hidden relative">
+                        <div id="chat-log" class="h-full flex flex-col space-y-4 overflow-hidden">
+                            </div>
+                        <div class="absolute bottom-0 left-0 w-full h-12 chat-gradient"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="history-view" class="view-container hidden h-full flex flex-col p-8 pt-16">
+                 <h1 class="text-3xl font-bold">Conversation History</h1>
+                 <div id="history-list" class="mt-4 space-y-2 flex-1 overflow-y-auto history-scrollbar">
+                    </div>
+            </div>
+
+            <div id="settings-view" class="view-container hidden w-full h-full p-4 md:p-8 pt-16 overflow-y-auto">
+                 <h2 class="text-3xl font-bold mb-6">Settings</h2>
+                 <div class="space-y-8 max-w-4xl mx-auto">
+                    <fieldset class="p-4 border border-theme rounded-lg">
+                        <legend class="px-2 text-lg font-semibold text-accent">Appearance</legend>
+                        <div class="setting-item flex flex-col sm:flex-row justify-between sm:items-center py-4"><div><h4 class="text-lg font-semibold">Theme</h4></div><div class="mt-3 sm:mt-0"><div id="theme-buttons" class="flex flex-wrap gap-2"><button data-theme="midnight-gold" class="theme-btn px-4 py-2 rounded btn-themed">Midnight Gold</button><button data-theme="modernist" class="theme-btn px-4 py-2 rounded btn-themed">Modernist</button><button data-theme="bumblebee" class="theme-btn px-4 py-2 rounded btn-themed">Bumblebee</button><button data-theme="industrial" class="theme-btn px-4 py-2 rounded btn-themed">Industrial</button></div></div></div>
+                        <div class="setting-item flex flex-col sm:flex-row justify-between sm:items-center py-4"><div><h4 class="text-lg font-semibold">Font Size</h4></div><div class="mt-3 sm:mt-0"><div id="font-size-buttons" class="flex space-x-2"><button data-size="sm" class="font-size-btn px-4 py-2 text-sm rounded btn-themed">Small</button><button data-size="base" class="font-size-btn px-4 py-2 text-sm rounded btn-themed">Medium</button><button data-size="lg" class="font-size-btn px-4 py-2 text-sm rounded btn-themed">Large</button></div></div></div>
+                    </fieldset>
+                    <fieldset class="p-4 border border-theme rounded-lg">
+                         <legend class="px-2 text-lg font-semibold text-accent">Voice & Speech</legend>
+                         <div class="setting-item flex flex-col sm:flex-row justify-between sm:items-center py-4"><div><h4 class="text-lg font-semibold">Language</h4></div><div class="mt-3 sm:mt-0"><select id="language-select" class="p-2 rounded w-48 border-none"></select></div></div>
+                         
+                         <div class="setting-item flex flex-col sm:flex-row justify-between sm:items-center py-4">
+                            <div><h4 class="text-lg font-semibold">Voice Model</h4></div>
+                            <div class="mt-3 sm:mt-0 flex items-center space-x-2">
+                                <select id="voice-model-select" class="p-2 rounded w-48 border-none"></select>
+                                <button id="preview-voice-btn" type="button" class="btn-accent p-2 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="text-accent-content"><path d="M7 6v12l10-6z"/></svg>
+                                </button>
+                            </div>
+                         </div>
+                         
+                         <div class="setting-item flex flex-col sm:flex-row justify-between sm:items-center py-4"><div><h4 class="text-lg font-semibold">Response Length</h4></div><div class="mt-3 sm:mt-0"><div id="response-length-buttons" class="flex space-x-2"><button data-length="concise" class="response-length-btn px-4 py-2 text-sm rounded btn-themed">Concise</button><button data-length="default" class="response-length-btn px-4 py-2 text-sm rounded btn-themed">Default</button><button data-length="detailed" class="response-length-btn px-4 py-2 text-sm rounded btn-themed">Detailed</button></div></div></div>
+                    </fieldset>
+                    <fieldset class="p-4 border border-theme rounded-lg">
+                        <legend class="px-2 text-lg font-semibold text-accent">Account & API</legend>
+                        <div class="setting-item flex flex-col sm:flex-row justify-between sm:items-center py-4"><div><h4 class="text-lg font-semibold">AI Provider</h4></div><div class="mt-3 sm:mt-0"><select id="api-provider-select" class="p-2 rounded w-48 border-none"><option value="gemini">Google Gemini</option><option value="openai">OpenAI GPT</option></select></div></div>
+                        <div class="setting-item flex flex-col sm:flex-row justify-between sm:items-center py-4"><div><h4 class="text-lg font-semibold">API Key</h4><p class="text-sm text-secondary mt-1">Your key is stored securely in your browser.</p></div><div class="mt-3 sm:mt-0"><input id="api-key-input" type="password" placeholder="••••••••••••••••••••" class="p-2 rounded w-full sm:w-64 focus:ring-2 focus:ring-yellow-500 focus:outline-none border-none"/></div></div>
+                        <div class="setting-item flex flex-col sm:flex-row justify-between sm:items-center py-4"><div><h4 class="text-lg font-semibold">Manage Data</h4></div><div class="mt-3 sm:mt-0"><button id="clear-history-btn" class="px-4 py-2 rounded btn-danger font-semibold">Clear All History</button></div></div>
+                    </fieldset>
+                 </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- App Globals ---
+        let conversationId = null;
+
+        // --- DOM Element Selections ---
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+        const navButtons = document.querySelectorAll('.nav-btn');
+        const views = document.querySelectorAll('.view-container');
+        const body = document.body;
+        const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+        const sidebarToggleIcon = document.getElementById('sidebar-toggle-icon');
+        const logoBtn = document.getElementById('logo-btn');
+        const waveformCanvas = document.getElementById('waveform-canvas');
+        const canvasCtx = waveformCanvas.getContext('2d');
+        const chatLog = document.getElementById('chat-log');
+        const chatBtn = document.getElementById('chat-btn');
+        const historyBtn = document.getElementById('history-btn');
+        const homeBtn = document.getElementById('home-btn');
+        const historyList = document.getElementById('history-list');
+        const startChattingBtn = document.getElementById('start-chatting-btn');
+        
+        // Settings Elements
+        const themeButtons = document.querySelectorAll('.theme-btn');
+        const fontSizeButtons = document.querySelectorAll('.font-size-btn');
+        const responseLengthButtons = document.querySelectorAll('.response-length-btn');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const apiProviderSelect = document.getElementById('api-provider-select');
+        const languageSelect = document.getElementById('language-select');
+        const voiceModelSelect = document.getElementById('voice-model-select');
+        const clearHistoryBtn = document.getElementById('clear-history-btn');
+        
+        // --- NEW/MODIFIED DOM ELEMENTS ---
+        const microphoneSelect = document.createElement('select'); 
+        microphoneSelect.id = 'microphone-select';
+        microphoneSelect.className = 'p-2 rounded w-48 border-none';
+        
+        // Get the new single preview button
+        const previewVoiceBtn = document.getElementById('preview-voice-btn'); 
+
+        // Inject the microphone select into the settings
+        const voiceSpeechFieldset = document.querySelector('#settings-view fieldset:nth-child(2)');
+        if (voiceSpeechFieldset) {
+            const micSettingDiv = document.createElement('div');
+            micSettingDiv.className = 'setting-item flex flex-col sm:flex-row justify-between sm:items-center py-4';
+            micSettingDiv.innerHTML = `
+                <div><h4 class="text-lg font-semibold">Microphone</h4></div>
+                <div class="mt-3 sm:mt-0"></div>
+            `;
+            micSettingDiv.querySelector('div:last-child').appendChild(microphoneSelect);
+            // Find the language setting to insert the mic setting before it
+            const languageSettingDiv = document.getElementById('language-select').closest('.setting-item');
+            if(languageSettingDiv) {
+                 voiceSpeechFieldset.insertBefore(micSettingDiv, languageSettingDiv);
+            } else {
+                 voiceSpeechFieldset.insertBefore(micSettingDiv, voiceSpeechFieldset.firstChild);
+            }
+        }
+        // --- END NEW/MODIFIED DOM ELEMENTS ---
+
+        // --- Speech Recognition, Synthesis & Audio ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const speechSynthesis = window.speechSynthesis;
+        let recognition;
+        if(SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+        } else {
+            console.error("Speech Recognition not supported in this browser.");
+        }
+
+        let audioContext;
+        let analyser;
+        let microphone;
+        let isListening = false;
+        let animationFrameId;
+        let silenceTimer;
+        let finalTranscript = '';
+        let voices = [];
+        let availableLanguages = [];
+        let availableMicrophones = [];
+
+        let settings = {
+            theme: 'midnight-gold',
+            fontSize: 'base',
+            responseLength: 'default',
+            apiKey: 'YOUR_GEMINI_API_KEY_HERE',
+            apiProvider: 'gemini',
+            voiceModel: '',
+            language: '',
+            sidebarCollapsed: false,
+            microphoneId: null
+        };
+
+        const saveSettings = () => {
+            localStorage.setItem('ai-assistant-settings', JSON.stringify(settings));
+        };
+
+        const loadSettings = () => {
+            const savedSettings = localStorage.getItem('ai-assistant-settings');
+            if (savedSettings) {
+                settings = JSON.parse(savedSettings);
+            }
+            applySettings();
+        };
+        
+        // --- Settings Application Logic ---
+        const applySettings = () => {
+            // Apply Theme
+            document.body.setAttribute('data-theme', settings.theme);
+            updateActiveButton(themeButtons, 'theme', settings.theme);
+
+            // Apply Font Size
+            const fontSizes = { sm: 'text-sm', base: 'text-base', lg: 'text-lg' };
+            body.classList.remove('text-sm', 'text-base', 'text-lg');
+            body.classList.add(fontSizes[settings.fontSize]);
+            updateActiveButton(fontSizeButtons, 'size', settings.fontSize);
+            
+            // Apply Other Settings
+            applySidebarState();
+            updateActiveButton(responseLengthButtons, 'length', settings.responseLength);
+            apiKeyInput.value = settings.apiKey || '';
+            apiProviderSelect.value = settings.apiProvider;
+            
+            if (settings.language) languageSelect.value = settings.language;
+            
+            if (settings.microphoneId) microphoneSelect.value = settings.microphoneId;
+        };
+
+        const updateActiveButton = (buttons, dataAttribute, value) => {
+             buttons.forEach(btn => {
+                if (btn.dataset[dataAttribute] === value) {
+                    btn.style.borderColor = 'var(--c-accent)';
+                    btn.style.borderWidth = '2px';
+                } else {
+                    btn.style.borderWidth = '0px';
+                }
+            });
+        };
+        
+        // --- Sidebar Collapse Logic ---
+        const applySidebarState = () => {
+            if (settings.sidebarCollapsed) {
+                sidebar.classList.add('-translate-x-full');
+                mainContent.classList.remove('pl-64');
+                sidebarToggleIcon.innerHTML = `<path d="m9 18 6-6-6-6"></path>`;
+            } else {
+                sidebar.classList.remove('-translate-x-full');
+                mainContent.classList.add('pl-64');
+                sidebarToggleIcon.innerHTML = `<path d="m15 18-6-6 6-6"></path>`;
+            }
+        };
+
+        sidebarToggleBtn.addEventListener('click', () => {
+            settings.sidebarCollapsed = !settings.sidebarCollapsed;
+            saveSettings();
+            applySidebarState();
+        });
+
+        // --- Canvas & Waveform Logic ---
+        const resizeCanvas = () => {
+            waveformCanvas.width = waveformCanvas.offsetWidth;
+            waveformCanvas.height = waveformCanvas.offsetHeight;
+            if (!isListening) drawFlatLine();
+        };
+
+        const drawFlatLine = () => {
+            canvasCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+            const themeColor = getComputedStyle(document.body).getPropertyValue('--c-waveform');
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = themeColor;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(0, waveformCanvas.height / 2);
+            canvasCtx.lineTo(waveformCanvas.width, waveformCanvas.height / 2);
+            canvasCtx.stroke();
+        };
+
+        const drawOscilloscopeWaveform = () => {
+            animationFrameId = requestAnimationFrame(drawOscilloscopeWaveform);
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteTimeDomainData(dataArray);
+
+            canvasCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+            const themeColor = getComputedStyle(document.body).getPropertyValue('--c-waveform');
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = themeColor;
+            canvasCtx.beginPath();
+            const sliceWidth = waveformCanvas.width * 1.0 / bufferLength;
+            let x = 0;
+            const centerY = waveformCanvas.height / 2;
+            const amplitudeScale = 0.8; 
+            let maxAmplitude = 0;
+            for(let i = 0; i < bufferLength; i++) {
+                const amp = Math.abs(dataArray[i] - 128); 
+                if(amp > maxAmplitude) maxAmplitude = amp;
+            }
+            if (maxAmplitude < 5) {
+                canvasCtx.moveTo(0, centerY);
+                canvasCtx.lineTo(waveformCanvas.width, centerY);
+            } else {
+                for (let i = 0; i < bufferLength; i++) {
+                    const normalizedAmplitude = (dataArray[i] - 128) / 128.0;
+                    const y = centerY + (normalizedAmplitude * centerY * amplitudeScale);
+                    i === 0 ? canvasCtx.moveTo(x, y) : canvasCtx.lineTo(x, y);
+                    x += sliceWidth;
+                }
+            }
+            canvasCtx.stroke();
+        };
+
+        // --- Voice Input Logic ---
+        const startListening = async () => {
+            if (isListening || !recognition) return;
+            speechSynthesis.cancel(); 
+
+            try {
+                // FEATURE 1: Use the selected microphone ID for constraints
+                const audioConstraints = settings.microphoneId 
+                    ? { deviceId: { exact: settings.microphoneId } } 
+                    : true; 
+
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                analyser.fftSize = 2048;
+                
+                isListening = true;
+                logoBtn.classList.add('ring-4', 'ring-red-500');
+                drawOscilloscopeWaveform();
+
+                recognition.lang = settings.language; 
+                finalTranscript = '';
+                recognition.start();
+
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                alert("Could not access the microphone. Please check your browser permissions.");
+            }
+        };
+
+        
+        const stopListening = (manualStop = false) => {
+            if (!isListening) return;
+            if (microphone) microphone.mediaStream.getTracks().forEach(track => track.stop());
+            if (audioContext) audioContext.close();
+            cancelAnimationFrame(animationFrameId);
+            
+            isListening = false;
+            logoBtn.classList.remove('ring-4', 'ring-red-500');
+            drawFlatLine();
+            
+            if(recognition) recognition.stop();
+
+            if (manualStop) {
+                const goodbyeMessage = getTranslatedMessage('goodbye');
+                addMessageToChatLog('ME', goodbyeMessage, false); 
+                speakText(goodbyeMessage);
+            }
+        };
+
+        const getTranslatedMessage = (key) => {
+            const translations = {
+                'goodbye': {
+                    'en-US': "I've stopped listening. Have a great day!",
+                    'es-ES': "He dejado de escuchar. ¡Que tenga un gran día!",
+                    'fr-FR': "J'ai arrêté d'écouter. Passez une excellente journée !",
+                    'de-DE': "Ich habe aufgehört zuzuhören. Haben Sie einen schönen Tag!",
+                    'ja-JP': "聞くのをやめました。良い一日を！",
+                    'hi-IN': "मैंने सुनना बंद कर दिया है। आपका दिन शुभ हो!",
+                    'te-IN': "నేను వినడం ఆపేశాను. మీకు శుభదినం!"
+                }
+            };
+            const lang = settings.language;
+            return translations[key][lang] || translations[key]['en-US'];
+        };
+
+        recognition.onresult = (event) => {
+            clearTimeout(silenceTimer);
+            let interimTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+            
+            silenceTimer = setTimeout(() => {
+                const processedTranscript = finalTranscript.trim();
+                if(processedTranscript){
+                   addMessageToChatLog('YOU', processedTranscript, true);
+                   if (processedTranscript.toLowerCase().includes('hey sam')) {
+                       const greeting = "Hello, how can I assist you?";
+                       addMessageToChatLog('ME', greeting, true);
+                       speakText(greeting);
+                   } else {
+                       getAIResponse(processedTranscript);
+                   }
+                   finalTranscript = ''; 
+                }
+            }, 1500); 
+        };
+
+        recognition.onend = () => {};
+        
+        logoBtn.addEventListener('click', () => {
+            isListening ? stopListening(true) : startListening();
+        });
+
+        // --- FEATURE 1: Microphone Enumeration Logic ---
+        const populateMicrophoneList = async () => {
+             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+                console.warn("MediaDevices API not supported.");
+                return;
+            }
+            await navigator.mediaDevices.getUserMedia({ audio: true }).catch(err => console.log("Mic permission required for listing."));
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            availableMicrophones = devices.filter(device => device.kind === 'audioinput');
+
+            microphoneSelect.innerHTML = '';
+            
+            if (availableMicrophones.length === 0) {
+                 microphoneSelect.innerHTML = '<option value="">No microphones found</option>';
+                 settings.microphoneId = null;
+                 saveSettings();
+                 return;
+            }
+
+            availableMicrophones.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Microphone ${index + 1}`; 
+                microphoneSelect.appendChild(option);
+            });
+
+            const defaultMic = settings.microphoneId 
+                ? availableMicrophones.find(d => d.deviceId === settings.microphoneId) 
+                : availableMicrophones[0];
+            
+            if (defaultMic) {
+                settings.microphoneId = defaultMic.deviceId;
+                microphoneSelect.value = defaultMic.deviceId;
+                saveSettings();
+            }
+        };
+        // --- END FEATURE 1 ---
+        
+        // --- Local History Management ---
+        const getHistory = () => {
+            const historyJSON = localStorage.getItem('ai-assistant-history');
+            return historyJSON ? JSON.parse(historyJSON) : { conversations: [] };
+        };
+
+        const saveHistory = (history) => {
+            localStorage.setItem('ai-assistant-history', JSON.stringify(history));
+        };
+
+        // --- Chat, AI & TTS Logic ---
+        const populateLanguageList = () => {
+            const langMap = new Map();
+            speechSynthesis.getVoices().forEach(voice => {
+                const lang = voice.lang;
+                if (!langMap.has(lang)) {
+                    langMap.set(lang, new Intl.DisplayNames([navigator.language], { type: 'language' }).of(lang));
+                }
+            });
+            availableLanguages = Array.from(langMap).sort((a, b) => a[1].localeCompare(b[1]));
+
+            languageSelect.innerHTML = '';
+            availableLanguages.forEach(([langCode, langName]) => {
+                const option = document.createElement('option');
+                option.value = langCode;
+                option.textContent = langName;
+                languageSelect.appendChild(option);
+            });
+
+            if (!settings.language || !availableLanguages.some(([code]) => code === settings.language)) {
+                settings.language = navigator.language || availableLanguages[0]?.[0] || 'en-US';
+                saveSettings();
+            }
+            languageSelect.value = settings.language;
+        };
+
+        // --- MODIFIED populateVoiceList for Dropdown + Single Button ---
+        const populateVoiceList = () => {
+            voices = speechSynthesis.getVoices();
+            voiceModelSelect.innerHTML = ''; // Ensure the select is cleared
+
+            const voicesForLang = voices.filter(voice => voice.lang.startsWith(settings.language));
+
+            if(voicesForLang.length === 0) {
+                 voiceModelSelect.innerHTML = '<option>No voices for this language</option>';
+                 return;
+            }
+            
+            voicesForLang.forEach(voice => {
+                const option = document.createElement('option');
+                option.textContent = `${voice.name} (${voice.lang})`;
+                option.setAttribute('data-name', voice.name);
+                option.value = voice.name; // Use voice name as value
+                voiceModelSelect.appendChild(option);
+            });
+
+            // Set the selected voice based on settings
+            const currentVoiceExists = voicesForLang.some(v => v.name === settings.voiceModel);
+            if (!currentVoiceExists && voicesForLang.length > 0) {
+                settings.voiceModel = voicesForLang[0].name;
+                saveSettings();
+            }
+            voiceModelSelect.value = settings.voiceModel;
+        };
+        // --- END MODIFIED populateVoiceList ---
+
+        // Modified speakText to accept an optional voice object for preview
+        const speakText = (text, voiceToUse = null) => {
+            if (speechSynthesis.speaking) speechSynthesis.cancel(); 
+            
+            const cleanedText = text.replace(/[*#]/g, '');
+            const utterance = new SpeechSynthesisUtterance(cleanedText);
+            
+            utterance.lang = settings.language; 
+            
+            // Determine the voice: use voiceToUse (for preview) or find from settings
+            const selectedVoiceName = voiceToUse ? voiceToUse.name : settings.voiceModel;
+            const selectedVoice = voices.find(voice => voice.name === selectedVoiceName);
+            
+            if(selectedVoice) utterance.voice = selectedVoice;
+            
+            // Only manage recognition start/stop for full app responses, not previews
+            if (!voiceToUse) { 
+                utterance.onstart = () => { if(recognition) recognition.abort(); };
+                utterance.onend = () => { if (isListening && recognition) recognition.start(); };
+            }
+            
+            utterance.onerror = (event) => {
+                console.error('SpeechSynthesisUtterance.onerror', event);
+                if (isListening && recognition && !voiceToUse) recognition.start();
+            };
+            speechSynthesis.speak(utterance);
+        };
+        
+        const startNewChat = () => {
+            stopListening();
+            speechSynthesis.cancel();
+            conversationId = null;
+            chatLog.innerHTML = `<p class="text-secondary text-center placeholder">New chat started. Press the logo to begin.</p>`;
+            showView('chat');
+            resizeCanvas();
+        };
+
+        const clearChatHistory = () => {
+            if (confirm("Are you sure you want to delete all conversations? This cannot be undone.")) {
+                localStorage.removeItem('ai-assistant-history');
+                historyList.innerHTML = '<p class="text-secondary">No history found.</p>';
+                startNewChat();
+            }
+        };
+
+        const addMessageToChatLog = (sender, message, shouldSave = false) => {
+            if(!message.trim()) return;
+            const placeholder = chatLog.querySelector('.placeholder');
+            if(placeholder) placeholder.remove();
+
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('flex', 'flex-col');
+            const senderClass = sender === 'YOU' ? 'text-accent' : 'text-secondary';
+            messageElement.innerHTML = `
+                <span class="font-bold text-lg ${senderClass}">${sender}:</span>
+                <p class="text-primary text-base md:text-lg ml-2">${message}</p>
+            `;
+            chatLog.appendChild(messageElement);
+            
+            // --- UPDATED: Robust chat overflow logic using a WHILE loop (FIFO) ---
+            // This ensures all messages that cause overflow are removed so the newest message is visible.
+            while (chatLog.scrollHeight > chatLog.clientHeight) {
+                if (chatLog.firstChild) chatLog.removeChild(chatLog.firstChild);
+                else break; 
+            }
+            // --- END UPDATED FIX ---
+
+            if (shouldSave) {
+                const history = getHistory();
+                const newMessage = { sender, text: message, createdAt: new Date().toISOString() };
+                
+                if (!conversationId) {
+                    conversationId = Date.now().toString();
+                    const newConversation = {
+                        id: conversationId,
+                        title: message.substring(0, 30) + '...',
+                        createdAt: new Date().toISOString(),
+                        messages: [newMessage]
+                    };
+                    history.conversations.push(newConversation);
+                } else {
+                    const conversation = history.conversations.find(c => c.id === conversationId);
+                    if (conversation) {
+                        conversation.messages.push(newMessage);
+                    }
+                }
+                saveHistory(history);
+            }
+        };
+        
+        const getAIResponse = async (userMessage) => {
+            const apiKey = settings.apiKey;
+            if (!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
+                const errorMsg = 'Please set your Google Gemini API key in the settings.';
+                addMessageToChatLog('ME', errorMsg, true);
+                speakText(errorMsg);
+                return;
+            }
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            const systemInstructions = {
+                concise: 'Your response must be brief and to the point, in one or two sentences maximum.',
+                default: 'You are a helpful AI assistant. Provide a standard, helpful response.',
+                detailed: 'Provide a comprehensive and detailed explanation, using multiple paragraphs if necessary.'
+            };
+            const systemPrompt = systemInstructions[settings.responseLength] || systemInstructions['default'];
+            const payload = {
+                contents: [{ parts: [{ text: userMessage }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`API Error: ${errorData?.error?.message || response.status}`);
+                }
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    const aiText = candidate.content.parts[0].text;
+                    addMessageToChatLog('ME', aiText, true);
+                    speakText(aiText);
+                } else {
+                    throw new Error("Invalid response structure from API.");
+                }
+            } catch (error) {
+                console.error('Failed to get AI response:', error);
+                const errorMsg = 'Sorry, there was a problem. Please check your API key and network connection.';
+                addMessageToChatLog('ME', errorMsg, true);
+                speakText(errorMsg);
+            }
+        };
+
+        const loadConversation = (convId) => {
+            conversationId = convId;
+            chatLog.innerHTML = '';
+            
+            const history = getHistory();
+            const conversation = history.conversations.find(c => c.id === convId);
+
+            if (conversation && conversation.messages) {
+                 if (conversation.messages.length === 0) {
+                     chatLog.innerHTML = `<p class="text-secondary text-center placeholder">This conversation is empty.</p>`;
+                 } else {
+                    conversation.messages.forEach(msg => {
+                        addMessageToChatLog(msg.sender, msg.text, false);
+                    });
+                 }
+            } else {
+                 chatLog.innerHTML = `<p class="text-secondary text-center placeholder">Could not load conversation.</p>`;
+            }
+            
+            showView('chat');
+            resizeCanvas();
+        };
+
+        const loadHistory = () => {
+            historyList.innerHTML = '';
+            const history = getHistory();
+            
+            if (!history.conversations || history.conversations.length === 0) {
+                historyList.innerHTML = '<p class="text-secondary">No history found.</p>';
+                return;
+            }
+            
+            const sortedConversations = [...history.conversations].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            sortedConversations.forEach(conv => {
+                // Format the timestamp
+                const date = new Date(conv.createdAt);
+                const formattedTimestamp = date.toLocaleString(settings.language || navigator.language, { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                
+                const historyItem = document.createElement('button');
+                // Use items-start to align the multiline title/timestamp at the top
+                historyItem.className = 'w-full text-left p-3 rounded-lg card card-hover flex justify-between items-start';
+                
+                // Add title and timestamp
+                historyItem.innerHTML = `
+                    <span class="font-semibold max-w-[60%]">${conv.title}</span>
+                    <span class="font-semibold text-primary text-right">${formattedTimestamp}</span>
+                `;
+                
+                historyItem.onclick = () => loadConversation(conv.id);
+                historyList.appendChild(historyItem);
+            });
+        };
+
+        // --- Event Listeners for Settings ---
+        themeButtons.forEach(button => button.addEventListener('click', () => {
+            settings.theme = button.dataset.theme;
+            saveSettings();
+            applySettings();
+            if (!isListening) drawFlatLine();
+        }));
+        fontSizeButtons.forEach(button => button.addEventListener('click', () => {
+            settings.fontSize = button.dataset.size;
+            saveSettings();
+            applySettings();
+        }));
+        responseLengthButtons.forEach(button => button.addEventListener('click', () => {
+            settings.responseLength = button.dataset.length;
+            saveSettings();
+            applySettings();
+        }));
+        apiKeyInput.addEventListener('input', (e) => {
+            settings.apiKey = e.target.value;
+            saveSettings();
+        });
+        apiProviderSelect.addEventListener('change', (e) => {
+            settings.apiProvider = e.target.value;
+            saveSettings();
+        });
+        languageSelect.addEventListener('change', (e) => {
+            settings.language = e.target.value;
+            saveSettings();
+            populateVoiceList();
+        });
+        
+        // Listener for the dropdown selection
+        voiceModelSelect.addEventListener('change', (e) => {
+            settings.voiceModel = e.target.value;
+            saveSettings();
+        });
+        
+        // Listener for the SINGLE preview button (Feature 3)
+        if (previewVoiceBtn) {
+            previewVoiceBtn.addEventListener('click', () => {
+                const selectedVoiceName = voiceModelSelect.value;
+                const voiceToPreview = voices.find(v => v.name === selectedVoiceName);
+                if (voiceToPreview) {
+                    speakText("This is a sample accent preview.", voiceToPreview);
+                }
+            });
+        }
+
+        clearHistoryBtn.addEventListener('click', clearChatHistory);
+        
+        // FEATURE 1: Microphone select listener
+        microphoneSelect.addEventListener('change', (e) => {
+            settings.microphoneId = e.target.value;
+            saveSettings();
+            if (isListening) {
+                stopListening();
+                startListening();
+            }
+        });
+
+        // --- View Switching Logic ---
+        const showView = (viewId) => {
+            views.forEach(view => {
+                view.classList.toggle('hidden', view.id !== `${viewId}-view`);
+                view.classList.toggle('flex', view.id === `${viewId}-view`);
+            });
+        };
+
+        navButtons.forEach(button => button.addEventListener('click', (e) => {
+            // FEATURE 2: Speech Output Interruption on Navigation
+            speechSynthesis.cancel(); 
+            
+            const target = e.currentTarget;
+            const viewId = target.dataset.view;
+            showView(viewId);
+        }));
+
+        if(chatBtn) chatBtn.addEventListener('click', startNewChat);
+        if(historyBtn) historyBtn.addEventListener('click', () => {
+            showView('history');
+            loadHistory();
+        });
+        if(homeBtn) homeBtn.addEventListener('click', () => showView('home'));
+        if(startChattingBtn) startChattingBtn.addEventListener('click', startNewChat);
+
+        // --- Initial Load ---
+        const initialLoad = async () => {
+            showView('home'); 
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Wait for voices to be loaded
+            await new Promise(resolve => {
+                const checkVoices = () => {
+                    if (speechSynthesis.getVoices().length > 0) {
+                        resolve();
+                    } else {
+                        speechSynthesis.onvoiceschanged = resolve;
+                    }
+                };
+                checkVoices();
+            });
+            
+            populateLanguageList();
+            populateVoiceList();
+            populateMicrophoneList(); 
+
+            loadSettings();
+        };
+
+        initialLoad();
+    });
+    </script>
+
+</body>
+</html>
